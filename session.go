@@ -13,7 +13,13 @@ type HostSession struct {
 	Appearance map[string]any `json:"appearance"`
 }
 
-func StartHostSession(ctx context.Context, cfg Config, visitorID string) (HostSession, error) {
+type HostSessionOptions struct {
+	VisitorID    string
+	HostMCPURL   string
+	HostMCPToken string
+}
+
+func StartHostSession(ctx context.Context, cfg Config, opts HostSessionOptions) (HostSession, error) {
 	baseURL := strings.TrimRight(strings.TrimSpace(cfg.BaseURL), "/")
 	hostKey := strings.TrimSpace(cfg.HostAPIKey)
 	if baseURL == "" || hostKey == "" {
@@ -24,7 +30,11 @@ func StartHostSession(ctx context.Context, cfg Config, visitorID string) (HostSe
 	cfg.HostAPIKey = hostKey
 	client := New(cfg)
 
-	token, err := client.Embed.CreateToken(ctx, TokenRequest{VisitorID: visitorID})
+	token, err := client.Embed.CreateToken(ctx, TokenRequest{
+		VisitorID:    strings.TrimSpace(opts.VisitorID),
+		HostMCPURL:   strings.TrimSpace(opts.HostMCPURL),
+		HostMCPToken: strings.TrimSpace(opts.HostMCPToken),
+	})
 	if err != nil {
 		return HostSession{}, err
 	}

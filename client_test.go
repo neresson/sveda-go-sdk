@@ -225,7 +225,7 @@ func TestStartHostSession(t *testing.T) {
 	session, err := StartHostSession(context.Background(), Config{
 		BaseURL:    server.URL + "/",
 		HostAPIKey: "host-secret",
-	}, "go-playground")
+	}, HostSessionOptions{VisitorID: "go-playground"})
 	if err != nil {
 		t.Fatalf("StartHostSession: %v", err)
 	}
@@ -244,7 +244,7 @@ func TestStartHostSession(t *testing.T) {
 func TestStartHostSessionRequiresConfig(t *testing.T) {
 	t.Parallel()
 
-	_, err := StartHostSession(context.Background(), Config{}, "go-playground")
+	_, err := StartHostSession(context.Background(), Config{}, HostSessionOptions{VisitorID: "go-playground"})
 	if err == nil {
 		t.Fatal("expected error")
 	}
