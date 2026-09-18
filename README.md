@@ -1,6 +1,8 @@
 # sveda-go-sdk
 
-Go SDK for the [Sveda AI](https://github.com/neresson/sveda) sidecar HTTP API.
+Go SDK for the [Sveda](https://sveda.dev) sidecar HTTP API.
+
+Docs: [sveda.dev/docs/hosts/go](https://sveda.dev/docs/hosts/go)
 
 Module: `github.com/neresson/sveda-go-sdk`
 
