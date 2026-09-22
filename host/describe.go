@@ -1,7 +1,5 @@
 package host
 
-import "strings"
-
 const hostManifestSchema = "sveda.host/v1"
 
 func (h *Host) registeredHooks() map[string]bool {

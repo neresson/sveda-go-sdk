@@ -27,6 +27,7 @@ func loadContract(t *testing.T) map[string]any {
 		}
 	}
 	t.Fatal("sidecar.v1.json contract fixture not found")
+	return nil
 }
 
 func TestSidecarContractSurface(t *testing.T) {
