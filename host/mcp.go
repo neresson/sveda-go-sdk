@@ -120,15 +120,19 @@ func (h *Host) listTools(user any) []map[string]any {
 		if schema == nil {
 			schema = map[string]any{"type": "object", "properties": map[string]any{}}
 		}
+		meta := map[string]any{
+			"domain": tool.Domain(),
+			"mode":   tool.Mode(),
+		}
+		if confirming, ok := tool.(ConfirmingTool); ok && confirming.Confirmation() == "required" {
+			meta["confirmation"] = "required"
+		}
 		entry := map[string]any{
 			"name":        tool.Name(),
 			"title":       tool.Name(),
 			"description": tool.Description(),
 			"inputSchema": schema,
-			"_meta": map[string]any{
-				"domain": tool.Domain(),
-				"mode":   tool.Mode(),
-			},
+			"_meta":       meta,
 		}
 		out = append(out, entry)
 	}

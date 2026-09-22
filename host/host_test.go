@@ -134,6 +134,9 @@ func TestMCPListsAndCallsTools(t *testing.T) {
 	if meta["domain"] != "demo" || meta["mode"] != "read" {
 		t.Fatalf("meta = %#v", meta)
 	}
+	if _, ok := meta["confirmation"]; ok {
+		t.Fatalf("confirmation = %#v", meta["confirmation"])
+	}
 
 	callBody := `{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"echo_message","arguments":{"message":"hello"}}}`
 	callReq := httptest.NewRequest(http.MethodPost, "/mcp/sveda", bytes.NewReader([]byte(callBody)))
@@ -260,5 +263,41 @@ func TestZeroArgResolveToolsStillWorks(t *testing.T) {
 	tools := listResp["result"].(map[string]any)["tools"].([]any)
 	if len(tools) != 1 {
 		t.Fatalf("tools = %#v", tools)
+	}
+}
+
+type deleteTool struct{ echoTool }
+
+func (deleteTool) Name() string         { return "delete_post" }
+func (deleteTool) Mode() string         { return host.ModeDelete }
+func (deleteTool) Confirmation() string { return "required" }
+
+func TestConfirmationMetaIsPublishedWhenRequired(t *testing.T) {
+	t.Parallel()
+
+	h := host.New(host.Config{})
+	h.ResolveToolsUsing(func() []host.Tool { return []host.Tool{echoTool{}, deleteTool{}} })
+	token, err := h.TokenStore().Mint()
+	if err != nil {
+		t.Fatalf("Mint: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/mcp/sveda", bytes.NewReader([]byte(`{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}`)))
+	req.Header.Set("Authorization", "Bearer "+token)
+	rec := httptest.NewRecorder()
+	h.Handler().ServeHTTP(rec, req)
+	var resp map[string]any
+	_ = json.Unmarshal(rec.Body.Bytes(), &resp)
+	tools := resp["result"].(map[string]any)["tools"].([]any)
+	byName := map[string]map[string]any{}
+	for _, item := range tools {
+		tool := item.(map[string]any)
+		byName[tool["name"].(string)] = tool["_meta"].(map[string]any)
+	}
+	if _, ok := byName["echo_message"]["confirmation"]; ok {
+		t.Fatalf("echo meta = %#v", byName["echo_message"])
+	}
+	if byName["delete_post"]["confirmation"] != "required" || byName["delete_post"]["mode"] != "delete" {
+		t.Fatalf("delete meta = %#v", byName["delete_post"])
 	}
 }
