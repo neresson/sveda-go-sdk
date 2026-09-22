@@ -82,6 +82,10 @@ By default, `host.Host` mints opaque MCP bearer tokens with an in-memory store (
 
 Implement `host.Tool` with `Name`, `Description`, `InputSchema`, `Mode`, `Domain`, and `Handle`.
 
+## Agent introspection
+
+`host.Describe(user)` returns a `map[string]any` manifest (`sveda.host/v1`) with the same tool payloads as MCP `tools/list`. Invoke it from your app's main package after wiring the host.
+
 ## License
 
 GNU Affero General Public License v3.0. See [LICENSE](LICENSE).

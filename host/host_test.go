@@ -301,3 +301,41 @@ func TestConfirmationMetaIsPublishedWhenRequired(t *testing.T) {
 		t.Fatalf("delete meta = %#v", byName["delete_post"])
 	}
 }
+
+func TestDescribeMatchesMcpToolsList(t *testing.T) {
+	t.Parallel()
+
+	h := host.New(host.Config{})
+	h.ResolveToolsUsing(func() []host.Tool { return []host.Tool{echoTool{}} })
+	user := map[string]any{"id": "user-1"}
+
+	manifest := h.Describe(user)
+	if manifest["schema"] != "sveda.host/v1" {
+		t.Fatalf("schema = %#v", manifest["schema"])
+	}
+
+	token, err := h.TokenStore().MintFor("user-1")
+	if err != nil {
+		t.Fatalf("MintFor: %v", err)
+	}
+	listReq := httptest.NewRequest(http.MethodPost, "/mcp/sveda", bytes.NewReader([]byte(`{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{"per_page":250}}`)))
+	listReq.Header.Set("Authorization", "Bearer "+token)
+	listRec := httptest.NewRecorder()
+	h.Handler().ServeHTTP(listRec, listReq)
+	var listResp map[string]any
+	_ = json.Unmarshal(listRec.Body.Bytes(), &listResp)
+	listed := listResp["result"].(map[string]any)["tools"].([]any)
+	byName := map[string]map[string]any{}
+	for _, item := range listed {
+		tool := item.(map[string]any)
+		byName[tool["name"].(string)] = tool
+	}
+
+	for _, item := range manifest["tools"].([]any) {
+		tool := item.(map[string]any)
+		name := tool["name"].(string)
+		if byName[name]["description"] != tool["description"] {
+			t.Fatalf("description mismatch for %s", name)
+		}
+	}
+}

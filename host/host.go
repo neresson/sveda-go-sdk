@@ -29,6 +29,7 @@ type Host struct {
 	resolveToolsFor func(user any) []Tool
 	policyUsing     func(user any) string
 	mintToken       func(context.Context) (string, error)
+	mintTokenCustom bool
 	authenticate    func(context.Context, string) error
 	authorize       func(context.Context) error
 	afterAuth       func(context.Context) error
@@ -88,6 +89,7 @@ func (h *Host) PolicyUsing(fn func(user any) string) {
 func (h *Host) MintTokenUsing(fn func(context.Context) (string, error)) {
 	if fn != nil {
 		h.mintToken = fn
+		h.mintTokenCustom = true
 	}
 }
 
