@@ -17,6 +17,8 @@ type HostSessionOptions struct {
 	VisitorID    string
 	HostMCPURL   string
 	HostMCPToken string
+	Policy       string
+	Grants       map[string]any
 }
 
 func StartHostSession(ctx context.Context, cfg Config, opts HostSessionOptions) (HostSession, error) {
@@ -34,6 +36,8 @@ func StartHostSession(ctx context.Context, cfg Config, opts HostSessionOptions) 
 		VisitorID:    strings.TrimSpace(opts.VisitorID),
 		HostMCPURL:   strings.TrimSpace(opts.HostMCPURL),
 		HostMCPToken: strings.TrimSpace(opts.HostMCPToken),
+		Policy:       strings.TrimSpace(opts.Policy),
+		Grants:       opts.Grants,
 	})
 	if err != nil {
 		return HostSession{}, err

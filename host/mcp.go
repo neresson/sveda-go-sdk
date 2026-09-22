@@ -77,9 +77,11 @@ func (h *Host) serveMCP(w http.ResponseWriter, r *http.Request) {
 	case "initialize":
 		h.writeJSONRPC(w, req.ID, h.initializeResult())
 	case "tools/list":
-		h.writeJSONRPC(w, req.ID, map[string]any{"tools": h.listTools()})
+		user := h.userFromBearer(bearerToken(r))
+		h.writeJSONRPC(w, req.ID, map[string]any{"tools": h.listTools(user)})
 	case "tools/call":
-		result, callErr := h.callTool(ctx, req.Params)
+		user := h.userFromBearer(bearerToken(r))
+		result, callErr := h.callTool(ctx, req.Params, user)
 		if callErr != nil {
 			h.writeJSONRPC(w, req.ID, map[string]any{
 				"content": []map[string]any{{"type": "text", "text": callErr.Error()}},
@@ -110,8 +112,8 @@ func (h *Host) initializeResult() map[string]any {
 	return result
 }
 
-func (h *Host) listTools() []map[string]any {
-	tools := h.Tools()
+func (h *Host) listTools(user any) []map[string]any {
+	tools := h.ToolsFor(user)
 	out := make([]map[string]any, 0, len(tools))
 	for _, tool := range tools {
 		schema := tool.InputSchema()
@@ -133,14 +135,14 @@ func (h *Host) listTools() []map[string]any {
 	return out
 }
 
-func (h *Host) callTool(ctx context.Context, params map[string]any) (map[string]any, error) {
+func (h *Host) callTool(ctx context.Context, params map[string]any, user any) (map[string]any, error) {
 	name, _ := params["name"].(string)
 	args, _ := params["arguments"].(map[string]any)
 	if args == nil {
 		args = map[string]any{}
 	}
 
-	for _, tool := range h.Tools() {
+	for _, tool := range h.ToolsFor(user) {
 		if tool.Name() != name {
 			continue
 		}

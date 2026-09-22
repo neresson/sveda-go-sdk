@@ -3,6 +3,7 @@ package sveda
 import (
 	"context"
 	"encoding/json"
+	"strings"
 )
 
 type Embed struct {
@@ -13,6 +14,8 @@ type TokenRequest struct {
 	VisitorID    string
 	HostMCPURL   string
 	HostMCPToken string
+	Policy       string
+	Grants       map[string]any
 }
 
 type TokenResponse struct {
@@ -30,6 +33,12 @@ func (e *Embed) CreateToken(ctx context.Context, req TokenRequest) (TokenRespons
 	if req.HostMCPURL != "" && req.HostMCPToken != "" {
 		payload["host_mcp_url"] = req.HostMCPURL
 		payload["host_mcp_token"] = req.HostMCPToken
+	}
+	if policy := strings.TrimSpace(req.Policy); policy != "" {
+		payload["policy"] = policy
+	}
+	if req.Grants != nil {
+		payload["grants"] = req.Grants
 	}
 
 	raw, err := e.client.requestJSON(ctx, "POST", "/sveda/embed/token", payload)

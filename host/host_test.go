@@ -157,3 +157,108 @@ func TestMCPListsAndCallsTools(t *testing.T) {
 		t.Fatalf("message = %#v", data["message"])
 	}
 }
+
+func TestHostStartSessionSendsPolicy(t *testing.T) {
+	t.Parallel()
+
+	var gotBody map[string]any
+	sidecar := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewDecoder(r.Body).Decode(&gotBody)
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"token":      "embed-token",
+			"visitor_id": "go-playground",
+			"expires_in": 3600,
+		})
+	}))
+	t.Cleanup(sidecar.Close)
+
+	h := host.New(host.Config{
+		BaseURL:    sidecar.URL,
+		HostAPIKey: "host-secret",
+		MCPURL:     "https://app.test/mcp/sveda",
+	})
+	h.ResolveToolsUsing(func() []host.Tool { return []host.Tool{echoTool{}} })
+	h.PolicyUsing(func(user any) string { return "reader" })
+
+	session, err := h.StartSession(context.Background(), "go-playground")
+	if err != nil {
+		t.Fatalf("StartSession: %v", err)
+	}
+	if session.Token != "embed-token" {
+		t.Fatalf("token = %q", session.Token)
+	}
+	if gotBody["policy"] != "reader" {
+		t.Fatalf("policy = %#v", gotBody["policy"])
+	}
+}
+
+func TestMCPFiltersToolsByAuthenticatedUser(t *testing.T) {
+	t.Parallel()
+
+	h := host.New(host.Config{})
+	h.ResolveToolsForUsing(func(user any) []host.Tool {
+		userMap, _ := user.(map[string]any)
+		if userMap != nil && userMap["id"] == "user-1" {
+			return []host.Tool{echoTool{}}
+		}
+		return nil
+	})
+
+	allowed, err := h.TokenStore().MintFor("user-1")
+	if err != nil {
+		t.Fatalf("MintFor: %v", err)
+	}
+	denied, err := h.TokenStore().MintFor("other")
+	if err != nil {
+		t.Fatalf("MintFor: %v", err)
+	}
+
+	callBody := `{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"echo_message","arguments":{"message":"hello"}}}`
+
+	allowedReq := httptest.NewRequest(http.MethodPost, "/mcp/sveda", bytes.NewReader([]byte(callBody)))
+	allowedReq.Header.Set("Authorization", "Bearer "+allowed)
+	allowedRec := httptest.NewRecorder()
+	h.Handler().ServeHTTP(allowedRec, allowedReq)
+	var allowedResp map[string]any
+	_ = json.Unmarshal(allowedRec.Body.Bytes(), &allowedResp)
+	if allowedResp["result"].(map[string]any)["isError"] != false {
+		t.Fatalf("allowed isError = %#v", allowedResp["result"])
+	}
+
+	deniedReq := httptest.NewRequest(http.MethodPost, "/mcp/sveda", bytes.NewReader([]byte(callBody)))
+	deniedReq.Header.Set("Authorization", "Bearer "+denied)
+	deniedRec := httptest.NewRecorder()
+	h.Handler().ServeHTTP(deniedRec, deniedReq)
+	var deniedResp map[string]any
+	_ = json.Unmarshal(deniedRec.Body.Bytes(), &deniedResp)
+	result := deniedResp["result"].(map[string]any)
+	if result["isError"] != true {
+		t.Fatalf("denied isError = %#v", result["isError"])
+	}
+	text := result["content"].([]any)[0].(map[string]any)["text"].(string)
+	if text != "unknown tool: echo_message" {
+		t.Fatalf("denied text = %#v", text)
+	}
+}
+
+func TestZeroArgResolveToolsStillWorks(t *testing.T) {
+	t.Parallel()
+
+	h := host.New(host.Config{})
+	h.ResolveToolsUsing(func() []host.Tool { return []host.Tool{echoTool{}} })
+	token, err := h.TokenStore().MintFor("user-1")
+	if err != nil {
+		t.Fatalf("MintFor: %v", err)
+	}
+
+	listReq := httptest.NewRequest(http.MethodPost, "/mcp/sveda", bytes.NewReader([]byte(`{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}`)))
+	listReq.Header.Set("Authorization", "Bearer "+token)
+	listRec := httptest.NewRecorder()
+	h.Handler().ServeHTTP(listRec, listReq)
+	var listResp map[string]any
+	_ = json.Unmarshal(listRec.Body.Bytes(), &listResp)
+	tools := listResp["result"].(map[string]any)["tools"].([]any)
+	if len(tools) != 1 {
+		t.Fatalf("tools = %#v", tools)
+	}
+}

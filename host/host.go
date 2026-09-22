@@ -25,11 +25,13 @@ type Config struct {
 type Host struct {
 	cfg Config
 
-	resolveTools func() []Tool
-	mintToken    func(context.Context) (string, error)
-	authenticate func(context.Context, string) error
-	authorize    func(context.Context) error
-	afterAuth    func(context.Context) error
+	resolveTools    func() []Tool
+	resolveToolsFor func(user any) []Tool
+	policyUsing     func(user any) string
+	mintToken       func(context.Context) (string, error)
+	authenticate    func(context.Context, string) error
+	authorize       func(context.Context) error
+	afterAuth       func(context.Context) error
 
 	tokenStore *MemoryTokenStore
 	tools      []Tool
@@ -74,6 +76,15 @@ func (h *Host) ResolveToolsUsing(fn func() []Tool) {
 	h.resolveTools = fn
 }
 
+// ResolveToolsForUsing registers a user-aware tool resolver used by ToolsFor and MCP handlers.
+func (h *Host) ResolveToolsForUsing(fn func(user any) []Tool) {
+	h.resolveToolsFor = fn
+}
+
+func (h *Host) PolicyUsing(fn func(user any) string) {
+	h.policyUsing = fn
+}
+
 func (h *Host) MintTokenUsing(fn func(context.Context) (string, error)) {
 	if fn != nil {
 		h.mintToken = fn
@@ -116,6 +127,21 @@ func (h *Host) Tools() []Tool {
 	return h.tools
 }
 
+// ToolsFor returns tools for the authenticated user. Falls back to Tools when no user-aware resolver is set.
+func (h *Host) ToolsFor(user any) []Tool {
+	if h.resolveToolsFor != nil {
+		return h.resolveToolsFor(user)
+	}
+	return h.Tools()
+}
+
+func (h *Host) PolicyFor(user any) string {
+	if h.policyUsing == nil {
+		return ""
+	}
+	return strings.TrimSpace(h.policyUsing(user))
+}
+
 func (h *Host) RegisterTool(tool Tool) {
 	h.tools = append(h.tools, tool)
 }
@@ -133,6 +159,7 @@ func (h *Host) StartSession(ctx context.Context, visitorID string) (sveda.HostSe
 
 	opts := sveda.HostSessionOptions{
 		VisitorID: strings.TrimSpace(visitorID),
+		Policy:    h.PolicyFor(visitorID),
 	}
 	if mcpURL != "" && mcpToken != "" {
 		opts.HostMCPURL = mcpURL
@@ -147,6 +174,17 @@ func (h *Host) StartSession(ctx context.Context, visitorID string) (sveda.HostSe
 
 func (h *Host) Handler() http.Handler {
 	return http.HandlerFunc(h.serveMCP)
+}
+
+func (h *Host) userFromBearer(token string) any {
+	userID, ok := h.tokenStore.Lookup(token)
+	if !ok {
+		return nil
+	}
+	if userID == "" {
+		return nil
+	}
+	return map[string]any{"id": userID}
 }
 
 func normalizePath(path string) string {
