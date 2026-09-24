@@ -331,8 +331,7 @@ func TestDescribeMatchesMcpToolsList(t *testing.T) {
 		byName[tool["name"].(string)] = tool
 	}
 
-	for _, item := range manifest["tools"].([]any) {
-		tool := item.(map[string]any)
+	for _, tool := range manifest["tools"].([]map[string]any) {
 		name := tool["name"].(string)
 		if byName[name]["description"] != tool["description"] {
 			t.Fatalf("description mismatch for %s", name)
