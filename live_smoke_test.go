@@ -8,6 +8,7 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	sveda "github.com/neresson/sveda-go-sdk"
 )
@@ -20,7 +21,7 @@ func TestLiveSmokeFlow(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	httpClient := &http.Client{Timeout: 60 * http.Second}
+	httpClient := &http.Client{Timeout: 60 * time.Second}
 	for _, path := range []string{"/sveda/health", "/sveda/ready"} {
 		resp, err := httpClient.Get(baseURL + path)
 		if err != nil {
